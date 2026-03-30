@@ -8,6 +8,6 @@ test('renders Authix landing heading', () => {
       <App />
     </BrowserRouter>
   );
-  const heading = screen.getByText(/Authix Mentorship Cloud/i);
+  const heading = screen.getByText(/Build Tenant-Branded Mentorship Businesses at Scale/i);
   expect(heading).toBeInTheDocument();
 });
