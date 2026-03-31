@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import StatusBadge from '../components/ui/StatusBadge';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 const mentors = [
   { name: 'Elena Park', skill: 'System Design', status: 'Active' },
@@ -9,6 +10,8 @@ const mentors = [
 ];
 
 function LandingPage() {
+  const { theme } = useTheme();
+
   return (
     <div className="container">
       <section className="hero">
@@ -17,6 +20,7 @@ function LandingPage() {
         <p className="muted">
           Authix delivers multi-tenant role-based mentoring workflows with premium UX.
         </p>
+        <p className="muted">Tenant: {theme.tenantId}</p>
         <Link to="/auth">
           <Button>Get Started</Button>
         </Link>

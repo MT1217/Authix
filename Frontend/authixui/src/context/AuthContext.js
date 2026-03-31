@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getTenantFromUrl } from '../utils/tenant';
 import { apiFetch } from '../utils/api';
+import { getTenantFromHostname } from '../utils/tenant';
 
 const AuthContext = createContext(null);
 
@@ -12,12 +12,25 @@ export function AuthProvider({ children }) {
   });
 
   useEffect(() => {
-    const tenantId = getTenantFromUrl();
-    localStorage.setItem('tenantId', tenantId);
+    // Align with App.jsx / index bootstrap and clear legacy defaults like tenant-alpha
+    localStorage.setItem('tenantId', getTenantFromHostname());
   }, []);
 
   async function login(payload) {
     const data = await apiFetch('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    setToken(data.token);
+    const nextUser = { role: data.role };
+    setUser(nextUser);
+    localStorage.setItem('authToken', data.token);
+    localStorage.setItem('authUser', JSON.stringify(nextUser));
+    return nextUser;
+  }
+
+  async function signup(payload) {
+    const data = await apiFetch('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
@@ -37,7 +50,14 @@ export function AuthProvider({ children }) {
   }
 
   const value = useMemo(
-    () => ({ token, user, login, logout, isAuthenticated: Boolean(token) }),
+    () => ({
+      token,
+      user,
+      login,
+      signup,
+      logout,
+      isAuthenticated: Boolean(token),
+    }),
     [token, user]
   );
 

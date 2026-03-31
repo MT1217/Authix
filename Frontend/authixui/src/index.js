@@ -2,17 +2,20 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import './index.css';
-import App from './App';
+import App, { getTenantFromHostname } from './App.jsx';
 import reportWebVitals from './reportWebVitals';
-import { ThemeProvider } from './context/ThemeContext';
+import { ThemeProvider } from './context/ThemeContext.jsx';
 import { AuthProvider } from './context/AuthContext';
+
+const tenantId = getTenantFromHostname();
+localStorage.setItem('tenantId', tenantId);
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <ThemeProvider>
+        <ThemeProvider tenantId={tenantId}>
           <App />
         </ThemeProvider>
       </AuthProvider>

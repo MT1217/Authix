@@ -1,27 +1,33 @@
-import { Course } from '../models/Course.js';
-import { Enrollment } from '../models/Enrollment.js';
-import { createCheckoutSession } from '../services/stripeService.js';
+import { Content } from '../models/Content.js';
+import { User } from '../models/User.js';
 
-export async function getMarketplace(req, res) {
-  const { q } = req.query;
-  const query = { tenantId: req.tenantId };
-  if (q) query.title = { $regex: q, $options: 'i' };
-
-  const courses = await Course.find(query);
-  return res.json(courses);
+/**
+ * Marketplace: list purchasable content for this tenant only.
+ */
+export async function listMarketplace(req, res) {
+  try {
+    const items = await Content.find({ tenantId: req.tenantId }).select('title url priceCents mentorId');
+    return res.json(items);
+  } catch (error) {
+    return res.status(500).json({ message: 'Marketplace failed', error: error.message });
+  }
 }
 
-export async function getMyCourses(req, res) {
-  const myEnrollments = await Enrollment.find({
-    tenantId: req.tenantId,
-    studentId: req.user.userId,
-  }).populate('courseId');
+/**
+ * Student's unlocked content after successful payment (webhook adds IDs).
+ */
+export async function listMyContent(req, res) {
+  try {
+    const user = await User.findOne({ _id: req.user.userId, tenantId: req.tenantId }).populate(
+      'unlockedContentIds'
+    );
 
-  return res.json(myEnrollments);
-}
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
 
-export async function startCheckout(req, res) {
-  const { courseTitle, amountInCents, mentorStripeAccountId } = req.body;
-  const session = await createCheckoutSession({ courseTitle, amountInCents, mentorStripeAccountId });
-  return res.json({ url: session.url });
+    return res.json(user.unlockedContentIds || []);
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not load content', error: error.message });
+  }
 }

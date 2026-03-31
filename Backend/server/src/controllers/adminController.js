@@ -1,32 +1,27 @@
-import { User } from '../models/User.js';
+import { Tenant } from '../models/Tenant.js';
 
-export async function getMentorQueue(req, res) {
-  const pendingMentors = await User.find({
-    tenantId: req.tenantId,
-    role: 'mentor',
-    isApprovedMentor: false,
-  });
+/**
+ * Admin-only: update tenant branding. Isolation: only req.tenant (same as header) is updated.
+ */
+export async function updateBranding(req, res) {
+  try {
+    const { logo, primaryColor } = req.body;
 
-  return res.json(pendingMentors);
-}
+    const tenant = await Tenant.findById(req.tenantId);
+    if (!tenant) {
+      return res.status(404).json({ message: 'Tenant not found' });
+    }
 
-export async function approveMentor(req, res) {
-  const { mentorId } = req.params;
-  const mentor = await User.findOneAndUpdate(
-    { _id: mentorId, tenantId: req.tenantId, role: 'mentor' },
-    { isApprovedMentor: true },
-    { new: true }
-  );
+    if (logo !== undefined) tenant.branding.logo = logo;
+    if (primaryColor !== undefined) tenant.branding.primaryColor = primaryColor;
 
-  if (!mentor) return res.status(404).json({ message: 'Mentor not found in tenant scope' });
-  return res.json(mentor);
-}
+    await tenant.save();
 
-export function getRevenueAnalytics(req, res) {
-  return res.json({
-    tenantId: req.tenantId,
-    grossVolume: 12840,
-    platformRevenue: 1284,
-    mentorPayouts: 11556,
-  });
+    return res.json({
+      logo: tenant.branding.logo,
+      primaryColor: tenant.branding.primaryColor,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: 'Branding update failed', error: error.message });
+  }
 }

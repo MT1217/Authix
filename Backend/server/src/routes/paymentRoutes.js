@@ -1,11 +1,16 @@
 import { Router } from 'express';
 import { authenticate, requireSameTenant } from '../middleware/auth.js';
 import { checkRole } from '../middleware/checkRole.js';
-import { updateBranding } from '../controllers/adminController.js';
+import { createPaymentIntent } from '../controllers/paymentController.js';
 
 const router = Router();
 
-router.use(authenticate, requireSameTenant, checkRole('admin'));
-router.patch('/branding', updateBranding);
+router.post(
+  '/create-intent',
+  authenticate,
+  requireSameTenant,
+  checkRole('student'),
+  createPaymentIntent
+);
 
 export default router;

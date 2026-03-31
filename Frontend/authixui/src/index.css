@@ -1,5 +1,6 @@
 :root {
   --bg: #0f172a;
+  --bg-color: #0f172a;
   --bg-soft: #111c34;
   --sidebar: #1e293b;
   --surface: rgba(255, 255, 255, 0.05);
@@ -30,7 +31,7 @@ body {
   margin: 0;
   font-family: 'Inter', 'Segoe UI', sans-serif;
   color: var(--text);
-  background: radial-gradient(circle at 15% 20%, #1d2f52 0%, var(--bg) 50%);
+  background: radial-gradient(circle at 15% 20%, #1d2f52 0%, var(--bg-color) 50%);
 }
 
 a {
@@ -70,6 +71,9 @@ a {
   background: var(--sidebar);
   border-right: 1px solid var(--border);
   padding: 22px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .sidebar-logo {
@@ -108,6 +112,10 @@ a {
 .main {
   margin-left: 260px;
   padding: 26px;
+}
+
+.topbar {
+  display: none;
 }
 
 .hero {
@@ -249,4 +257,58 @@ a {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 18px;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tab-btn {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+@media (max-width: 860px) {
+  .app-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(15, 23, 42, 0.92);
+    backdrop-filter: blur(10px);
+    z-index: 30;
+  }
+
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    z-index: 40;
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .main {
+    margin-left: 0;
+    padding: 16px;
+  }
 }

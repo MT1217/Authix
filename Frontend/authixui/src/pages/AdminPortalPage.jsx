@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import DashboardLayout from '../components/layout/DashboardLayout';
+import SidebarLayout from '../components/layout/SidebarLayout';
 import DataTable from '../components/ui/DataTable';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../context/ThemeContext.jsx';
 
 const columns = [
   { key: 'mentor', title: 'Mentor' },
@@ -16,12 +16,12 @@ const rows = [
 ];
 
 function AdminPortalPage() {
-  const { tenantTheme, updateBranding } = useTheme();
-  const [color, setColor] = useState(tenantTheme.primary);
-  const [logo, setLogo] = useState(tenantTheme.logo);
+  const { theme, updateTheme } = useTheme();
+  const [color, setColor] = useState(theme.primary);
+  const [bgColor, setBgColor] = useState(theme.bgColor);
 
   return (
-    <DashboardLayout title="Admin Settings">
+    <SidebarLayout title="Admin Dashboard">
       <div className="split">
         <section className="glass page-section">
           <h3>Branding Engine</h3>
@@ -35,19 +35,20 @@ function AdminPortalPage() {
               onChange={(e) => {
                 const next = e.target.value;
                 setColor(next);
-                updateBranding({ primary: next });
+                updateTheme({ primary: next });
               }}
             />
           </label>
           <label>
-            Logo Text
+            Background Color
             <input
               className="field"
-              value={logo}
+              type="color"
+              value={bgColor}
               onChange={(e) => {
-                const next = e.target.value.slice(0, 2).toUpperCase();
-                setLogo(next);
-                updateBranding({ logo: next });
+                const next = e.target.value;
+                setBgColor(next);
+                updateTheme({ bgColor: next });
               }}
             />
           </label>
@@ -57,7 +58,7 @@ function AdminPortalPage() {
           <DataTable columns={columns} rows={rows} />
         </section>
       </div>
-    </DashboardLayout>
+    </SidebarLayout>
   );
 }
 
