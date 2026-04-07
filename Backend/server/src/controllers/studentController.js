@@ -1,33 +1,126 @@
-import { Content } from '../models/Content.js';
+import mongoose from 'mongoose';
 import { User } from '../models/User.js';
+import { Content } from '../models/Content.js';
+import { Submission } from '../models/Submission.js';
 
 /**
- * Marketplace: list purchasable content for this tenant only.
+ * Searches for mentors by name or expertise.
  */
-export async function listMarketplace(req, res) {
+export async function searchMentors(req, res) {
   try {
-    const items = await Content.find({ tenantId: req.tenantId }).select('title url priceCents mentorId');
-    return res.json(items);
+    const { query } = req.query;
+    let filter = { tenantId: req.tenantId, role: 'mentor' };
+    
+    if (query) {
+      filter = {
+        ...filter,
+        $or: [
+          { 'profile.name': { $regex: query, $options: 'i' } },
+          { 'profile.expertise': { $regex: query, $options: 'i' } }
+        ]
+      };
+    }
+    
+    const mentors = await User.find(filter).select('profile email');
+    return res.json(mentors);
   } catch (error) {
-    return res.status(500).json({ message: 'Marketplace failed', error: error.message });
+    return res.status(500).json({ message: 'Mentor search failed', error: error.message });
   }
 }
 
 /**
- * Student's unlocked content after successful payment (webhook adds IDs).
+ * Subscribe to a specific mentor.
  */
-export async function listMyContent(req, res) {
+export async function subscribeToMentor(req, res) {
   try {
-    const user = await User.findOne({ _id: req.user.userId, tenantId: req.tenantId }).populate(
-      'unlockedContentIds'
-    );
-
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+    const { mentorId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(mentorId)) {
+        return res.status(400).json({ message: 'Invalid mentor ID' });
     }
 
-    return res.json(user.unlockedContentIds || []);
+    const mentor = await User.findOne({ _id: mentorId, tenantId: req.tenantId, role: 'mentor' });
+    if (!mentor) {
+      return res.status(404).json({ message: 'Mentor not found in this tenant' });
+    }
+
+    await User.findByIdAndUpdate(req.user.userId, {
+      $addToSet: { subscribedMentorIds: mentor._id }
+    });
+
+    return res.json({ message: 'Subscribed successfully' });
   } catch (error) {
-    return res.status(500).json({ message: 'Could not load content', error: error.message });
+    return res.status(500).json({ message: 'Subscription failed', error: error.message });
   }
+}
+
+/**
+ * List mentors this student is subscribed to.
+ */
+export async function listMyMentors(req, res) {
+  try {
+    const me = await User.findById(req.user.userId).populate('subscribedMentorIds', 'profile email');
+    return res.json(me.subscribedMentorIds || []);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to load subscribed mentors', error: error.message });
+  }
+}
+
+/**
+ * Get content from a subscribed mentor.
+ */
+export async function getMentorContent(req, res) {
+  try {
+     const { mentorId } = req.params;
+     const me = await User.findById(req.user.userId);
+     
+     if (!me.subscribedMentorIds.includes(mentorId)) {
+         return res.status(403).json({ message: 'Not subscribed to this mentor' });
+     }
+
+     const content = await Content.find({ mentorId, tenantId: req.tenantId });
+     return res.json(content);
+  } catch (error) {
+     return res.status(500).json({ message: 'Failed to load content', error: error.message });
+  }
+}
+
+/**
+ * Submit answers to a mentor's assignment.
+ */
+export async function submitAssignment(req, res) {
+    try {
+        const { contentId } = req.params;
+        const { answers, mentorId } = req.body;
+
+        const content = await Content.findOne({ _id: contentId, mentorId, tenantId: req.tenantId });
+        if (!content) {
+            return res.status(404).json({ message: 'Assignment not found' });
+        }
+
+        const submission = await Submission.findOneAndUpdate(
+            { tenantId: req.tenantId, studentId: req.user.userId, contentId },
+            { mentorId, answers, status: 'pending' },
+            { upsert: true, new: true }
+        );
+
+        return res.json(submission);
+    } catch (error) {
+        return res.status(500).json({ message: 'Submission failed', error: error.message });
+    }
+}
+
+/**
+ * List the student's evaluated submissions (performance report loop).
+ */
+export async function listMySubmissions(req, res) {
+    try {
+        const submissions = await Submission.find({ tenantId: req.tenantId, studentId: req.user.userId })
+            .populate('mentorId', 'profile.name')
+            .populate('contentId', 'title');
+        
+        return res.json(submissions);
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to load submissions', error: error.message });
+    }
 }

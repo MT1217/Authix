@@ -1,19 +1,6 @@
 import { useState } from 'react';
 import SidebarLayout from '../components/layout/SidebarLayout';
-import DataTable from '../components/ui/DataTable';
 import { useTheme } from '../context/ThemeContext.jsx';
-
-const columns = [
-  { key: 'mentor', title: 'Mentor' },
-  { key: 'gross', title: 'Gross' },
-  { key: 'mentorShare', title: 'Mentor (90%)' },
-  { key: 'platformShare', title: 'Platform (10%)' },
-];
-
-const rows = [
-  { id: 1, mentor: 'Ravi', gross: '$1200', mentorShare: '$1080', platformShare: '$120' },
-  { id: 2, mentor: 'Elena', gross: '$980', mentorShare: '$882', platformShare: '$98' },
-];
 
 function AdminPortalPage() {
   const { theme, updateTheme } = useTheme();
@@ -22,41 +9,53 @@ function AdminPortalPage() {
 
   return (
     <SidebarLayout title="Admin Dashboard">
-      <div className="split">
-        <section className="glass page-section">
-          <h3>Branding Engine</h3>
-          <p className="muted">Changes apply to root CSS variables in real-time.</p>
-          <label>
-            Primary Accent
-            <input
-              className="field"
-              type="color"
-              value={color}
-              onChange={(e) => {
-                const next = e.target.value;
-                setColor(next);
-                updateTheme({ primary: next });
-              }}
-            />
-          </label>
-          <label>
-            Background Color
-            <input
-              className="field"
-              type="color"
-              value={bgColor}
-              onChange={(e) => {
-                const next = e.target.value;
-                setBgColor(next);
-                updateTheme({ bgColor: next });
-              }}
-            />
-          </label>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: '32px' }}>
+        
+        <section className="glass-panel" style={{ padding: '32px', display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.5rem', marginBottom: '8px' }}>Branding Engine</h3>
+            <p className="muted" style={{ lineHeight: '1.5' }}>
+              Customize your tenant's look. Changes apply to CSS variables in real-time across the entire organization.
+            </p>
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Primary Accent Color</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <input
+                  style={{ width: '60px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer', padding: 0, background: 'transparent' }}
+                  type="color"
+                  value={color}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setColor(next);
+                    updateTheme({ primary: next });
+                  }}
+                />
+                <span className="muted" style={{ fontFamily: 'monospace' }}>{color}</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontWeight: 600, color: 'var(--text-muted)' }}>Background Theme Color</label>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <input
+                  style={{ width: '60px', height: '40px', border: 'none', borderRadius: '8px', cursor: 'pointer', padding: 0, background: 'transparent' }}
+                  type="color"
+                  value={bgColor}
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setBgColor(next);
+                    updateTheme({ bgColor: next });
+                  }}
+                />
+                <span className="muted" style={{ fontFamily: 'monospace' }}>{bgColor}</span>
+              </div>
+            </div>
+          </div>
         </section>
-        <section className="glass page-section">
-          <h3>Revenue Table</h3>
-          <DataTable columns={columns} rows={rows} />
-        </section>
+
       </div>
     </SidebarLayout>
   );

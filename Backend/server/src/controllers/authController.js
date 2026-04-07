@@ -9,7 +9,7 @@ import { env } from '../config/env.js';
  */
 export async function signup(req, res) {
   try {
-    const { email, password, role } = req.body;
+    const { email, password, role, name, expertise } = req.body;
 
     if (!email || !password || !role) {
       return res.status(400).json({ message: 'email, password, and role are required' });
@@ -26,6 +26,10 @@ export async function signup(req, res) {
       email,
       passwordHash,
       role,
+      profile: {
+          name: name || '',
+          expertise: expertise || ''
+      }
     });
 
     const token = jwt.sign(
@@ -54,6 +58,7 @@ export async function signup(req, res) {
 export async function login(req, res) {
   try {
     const { email, password } = req.body;
+    // console.log(`om namah shivay`);
 
     if (!email || !password) {
       return res.status(400).json({ message: 'email and password required' });

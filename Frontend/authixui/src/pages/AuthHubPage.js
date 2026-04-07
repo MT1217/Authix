@@ -8,6 +8,8 @@ function AuthHubPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('student');
+  const [name, setName] = useState('');
+  const [expertise, setExpertise] = useState('');
   const [error, setError] = useState('');
   const { login, signup } = useAuth();
   const navigate = useNavigate();
@@ -36,7 +38,7 @@ function AuthHubPage() {
         const user = await login({ email, password });
         redirectByRole(user.role);
       } else {
-        const user = await signup({ email, password, role });
+        const user = await signup({ email, password, role, name, expertise });
         redirectByRole(user.role);
       }
     } catch (e) {
@@ -47,40 +49,57 @@ function AuthHubPage() {
 
   return (
     <div className="auth-wrap">
-      <form className="glass auth-card" onSubmit={handleSubmit}>
-        <h2>{mode === 'login' ? 'Welcome Back' : 'Create Account'}</h2>
-        <p className="muted">
+      <form className="glass-panel auth-card" onSubmit={handleSubmit}>
+        <h2 className="text-gradient" style={{ marginBottom: '16px', fontSize: '2rem' }}>
+          {mode === 'login' ? 'Welcome Back' : 'Create Account'}
+        </h2>
+        <p className="muted" style={{ marginBottom: '24px' }}>
           {mode === 'login'
-            ? 'Use the same email/password you registered with for this organization.'
-            : 'Choose a role for this first account. You need header tenant platform-main (localhost) and npm run seed:demo on the backend.'}
+            ? 'Access your unified platform using your secure credentials.'
+            : 'Join the interactive mentorship platform.'}
         </p>
-        <input className="field" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="Email" />
-        <input
-          className="field"
-          value={password}
-          onChange={(ev) => setPassword(ev.target.value)}
-          placeholder="Password"
-          type="password"
-        />
-        {mode === 'signup' && (
-          <select className="field" value={role} onChange={(ev) => setRole(ev.target.value)}>
-            <option value="student">Student</option>
-            <option value="mentor">Mentor</option>
-            <option value="admin">Admin</option>
-          </select>
-        )}
-        {error && <p style={{ color: '#fca5a5' }}>{error}</p>}
-        <div style={{ marginTop: 14, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <Button type="submit">{mode === 'login' ? 'Login' : 'Sign up'}</Button>
+        
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <input className="field" value={email} onChange={(ev) => setEmail(ev.target.value)} placeholder="Email address" type="email" required />
+          <input
+            className="field"
+            value={password}
+            onChange={(ev) => setPassword(ev.target.value)}
+            placeholder="Password"
+            type="password"
+            required
+          />
+          {mode === 'signup' && (
+            <>
+              <select className="field" value={role} onChange={(ev) => setRole(ev.target.value)} style={{ appearance: 'none', backgroundColor: 'rgba(0,0,0,0.3)' }}>
+                <option value="student">🎓 Student (Learner)</option>
+                <option value="mentor">👨‍🏫 Mentor (Creator)</option>
+                <option value="admin">🏢 Tenant Admin (Owner)</option>
+              </select>
+              
+              <input className="field" value={name} onChange={(ev) => setName(ev.target.value)} placeholder="Full Name" type="text" required={role !== 'admin'} />
+              
+              {role === 'mentor' && (
+                <input className="field" value={expertise} onChange={(ev) => setExpertise(ev.target.value)} placeholder="Your Expertise (e.g. System Design, Product Management)" type="text" required />
+              )}
+            </>
+          )}
+        </div>
+
+        {error && <div style={{ color: 'var(--danger)', marginTop: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px', border: '1px solid rgba(239, 68, 68, 0.2)' }}>{error}</div>}
+        
+        <div style={{ marginTop: '32px', display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+          <Button type="submit" style={{ flex: 1 }}>{mode === 'login' ? 'Login Securely' : 'Create Profile'}</Button>
           <Button
             type="button"
-            variant="secondary"
+            className="secondary"
+            style={{ flex: 1 }}
             onClick={() => {
               setError('');
               setMode(mode === 'login' ? 'signup' : 'login');
             }}
           >
-            Switch to {mode === 'login' ? 'Sign up' : 'Login'}
+            {mode === 'login' ? 'Need an account?' : 'Already have one?'}
           </Button>
         </div>
       </form>

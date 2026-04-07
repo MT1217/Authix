@@ -1,12 +1,14 @@
 import { Content } from '../models/Content.js';
+import { User } from '../models/User.js';
+import { Submission } from '../models/Submission.js';
 import mongoose from 'mongoose';
 
 /**
- * Mentor-only: create or version content. Every document includes tenantId for isolation.
+ * Mentor-only: create content with optional assignment.
  */
 export async function createContent(req, res) {
   try {
-    const { title, url, priceCents } = req.body;
+    const { title, url, assignmentDescription, totalScore } = req.body;
 
     if (!title || !url) {
       return res.status(400).json({ message: 'title and url are required' });
@@ -19,7 +21,10 @@ export async function createContent(req, res) {
       mentorId,
       title,
       url,
-      priceCents: Number(priceCents) || 0,
+      assignment: {
+        description: assignmentDescription || '',
+        totalScore: Number(totalScore) || 100
+      },
       versionHistory: [{ version: 1, url, label: 'Initial' }],
     });
 
@@ -30,7 +35,7 @@ export async function createContent(req, res) {
 }
 
 /**
- * Append a new version — still scoped to tenant + owning mentor.
+ * Append a new version
  */
 export async function addContentVersion(req, res) {
   try {
@@ -48,7 +53,7 @@ export async function addContentVersion(req, res) {
     });
 
     if (!content) {
-      return res.status(404).json({ message: 'Content not found or not owned by this mentor' });
+      return res.status(404).json({ message: 'Content not found' });
     }
 
     const nextVersion = (content.versionHistory?.length || 0) + 1;
@@ -60,4 +65,62 @@ export async function addContentVersion(req, res) {
   } catch (error) {
     return res.status(500).json({ message: 'Version update failed', error: error.message });
   }
+}
+
+/**
+ * Get all students subscribed to this mentor
+ */
+export async function listMyStudents(req, res) {
+    try {
+        const students = await User.find({ 
+            tenantId: req.tenantId, 
+            role: 'student',
+            subscribedMentorIds: req.user.userId 
+        }).select('email profile');
+        return res.json(students);
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to load students', error: error.message });
+    }
+}
+
+/**
+ * Get all submissions pointing to this mentor
+ */
+export async function listSubmissions(req, res) {
+    try {
+        const submissions = await Submission.find({ tenantId: req.tenantId, mentorId: req.user.userId })
+            .populate('studentId', 'email')
+            .populate('contentId', 'title assignment');
+        return res.json(submissions);
+    } catch (error) {
+        return res.status(500).json({ message: 'Failed to load submissions', error: error.message });
+    }
+}
+
+/**
+ * Evaluate a submission
+ */
+export async function evaluateSubmission(req, res) {
+    try {
+        const { submissionId } = req.params;
+        const { score, feedback } = req.body;
+        
+        const submission = await Submission.findOneAndUpdate(
+            { _id: submissionId, mentorId: req.user.userId, tenantId: req.tenantId },
+            { 
+                status: 'evaluated', 
+                evaluation: {
+                    score: Number(score),
+                    feedback,
+                    evaluatedAt: new Date()
+                }
+            },
+            { new: true }
+        );
+
+        if (!submission) return res.status(404).json({ message: 'Submission not found' });
+        return res.json(submission);
+    } catch (error) {
+        return res.status(500).json({ message: 'Evaluation failed', error: error.message });
+    }
 }

@@ -12,8 +12,6 @@ const tenantSchema = new mongoose.Schema(
       logo: { type: String, default: '' },
       primaryColor: { type: String, default: '#3b82f6' },
     },
-    /** Stripe Connect account ID for this organization — receives ~90% of charges after platform fee */
-    stripeAccountId: { type: String, default: '' },
   },
   { timestamps: true }
 );

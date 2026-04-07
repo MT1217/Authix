@@ -21,7 +21,11 @@ const contentSchema = new mongoose.Schema(
     title: { type: String, required: true },
     /** Current canonical file/source URL */
     url: { type: String, required: true },
-    priceCents: { type: Number, default: 0 },
+    /** Optional assignment or homework instructions for students */
+    assignment: {
+      description: { type: String, default: '' },
+      totalScore: { type: Number, default: 100 }
+    },
     versionHistory: [versionEntrySchema],
   },
   { timestamps: true }

@@ -23,7 +23,6 @@ async function run() {
       name: 'Authix Platform',
       subdomain: 'platform-main',
       branding: { logo: '', primaryColor: '#3b82f6' },
-      stripeAccountId: '',
     },
     { upsert: true }
   );

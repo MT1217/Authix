@@ -15,7 +15,15 @@ const userSchema = new mongoose.Schema(
       enum: ['admin', 'mentor', 'student'],
       required: true,
     },
-    /** After successful payment (webhook), content IDs this student can access within this tenant */
+    /** Mentor Profile Information (Ignored for Students) */
+    profile: {
+      name: { type: String, default: '' },
+      expertise: { type: String, default: '' },
+      bio: { type: String, default: '' }
+    },
+    /** For Students: Mentors they have subscribed to */
+    subscribedMentorIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    /** Content IDs explicitly unlocked (legacy/direct access) */
     unlockedContentIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Content' }],
   },
   { timestamps: true }
