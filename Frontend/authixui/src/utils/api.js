@@ -4,7 +4,8 @@ const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 export async function apiFetch(path, options = {}) {
   const tenantId = getActiveTenantId();
-  const token = localStorage.getItem('authToken');
+  // Use sessionStorage so different tabs can be logged into different accounts safely.
+  const token = sessionStorage.getItem('authToken');
 
   const headers = {
     'Content-Type': 'application/json',

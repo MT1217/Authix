@@ -8,29 +8,40 @@ function StudentDashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [mentors, setMentors] = useState([]);
   const [myMentors, setMyMentors] = useState([]);
+  const [subscribedMentorIds, setSubscribedMentorIds] = useState(() => new Set());
   const [myContent, setMyContent] = useState([]);
   const [submissions, setSubmissions] = useState([]);
   const [activeMentorId, setActiveMentorId] = useState(null);
   
   const [submissionText, setSubmissionText] = useState({});
 
+  async function refreshMyMentors() {
+    const list = await apiFetch('/api/student/mentors/subscribed');
+    setMyMentors(list);
+    setSubscribedMentorIds(new Set(list.map((m) => m._id)));
+  }
+
   useEffect(() => {
     if (tab === 'search') {
       apiFetch(`/api/student/mentors/search?query=${searchQuery}`)
         .then(setMentors).catch(console.error);
     } else if (tab === 'mentors') {
-      apiFetch('/api/student/mentors/subscribed')
-        .then(setMyMentors).catch(console.error);
+      refreshMyMentors().catch(console.error);
     } else if (tab === 'submissions') {
       apiFetch('/api/student/submissions')
         .then(setSubmissions).catch(console.error);
     }
   }, [tab, searchQuery]);
 
+  useEffect(() => {
+    // Always keep subscriptions in memory so Search and My Mentors stay synchronized.
+    refreshMyMentors().catch(() => {});
+  }, []);
+
   async function handleSubscribe(mentorId) {
     await apiFetch(`/api/student/mentors/${mentorId}/subscribe`, { method: 'POST' });
-    alert('Subscribed successfully!');
-    setTab('mentors');
+    // Update global subscription state so Search UI updates immediately.
+    await refreshMyMentors();
   }
 
   async function loadMentorContent(mentorId) {
@@ -74,7 +85,13 @@ function StudentDashboardPage() {
                 <div className="glass-panel" key={m._id} style={{ padding: '24px', display: 'flex', flexDirection: 'column' }}>
                   <h4 style={{ fontSize: '1.25rem', marginBottom: '8px' }}>{m.profile.name || 'Unnamed Mentor'}</h4>
                   <p className="muted" style={{ marginBottom: '16px', flex: 1 }}>{m.profile.expertise || 'General Expert'}</p>
-                  <Button onClick={() => handleSubscribe(m._id)}>Subscribe</Button>
+                  {subscribedMentorIds.has(m._id) ? (
+                    <Button disabled style={{ opacity: 0.7, cursor: 'not-allowed' }}>
+                      Subscribed
+                    </Button>
+                  ) : (
+                    <Button onClick={() => handleSubscribe(m._id)}>Subscribe</Button>
+                  )}
                 </div>
               ))}
             </div>
