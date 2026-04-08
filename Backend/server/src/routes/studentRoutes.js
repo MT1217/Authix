@@ -7,6 +7,7 @@ import {
     submitAssignment, 
     listMySubmissions 
 } from '../controllers/studentController.js';
+import { getStudentThread, postStudentMessage } from '../controllers/chatController.js';
 import { authenticate, requireSameTenant } from '../middleware/auth.js';
 import { checkRole } from '../middleware/checkRole.js';
 
@@ -20,5 +21,9 @@ router.get('/mentors/subscribed', listMyMentors);
 router.get('/content/:mentorId', getMentorContent);
 router.post('/content/:contentId/submit', submitAssignment);
 router.get('/submissions', listMySubmissions);
+
+// Assignment-specific chat threads (one thread per assignment x student x mentor).
+router.get('/chats/threads/:assignmentId/:mentorId', getStudentThread);
+router.post('/chats/threads/:assignmentId/:mentorId/messages', postStudentMessage);
 
 export default router;

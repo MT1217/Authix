@@ -2,11 +2,23 @@ import { useState, useEffect } from 'react';
 import SidebarLayout from '../components/layout/SidebarLayout';
 import Button from '../components/ui/Button';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 function MentorContentPage() {
   const [tab, setTab] = useState('upload');
   const [students, setStudents] = useState([]);
   const [submissions, setSubmissions] = useState([]);
+
+  const { user } = useAuth();
+  const mentorUserId = user?.userId;
+
+  // Chat tab state
+  const [chatAssignments, setChatAssignments] = useState([]);
+  const [selectedAssignmentId, setSelectedAssignmentId] = useState('');
+  const [mentorThreads, setMentorThreads] = useState([]);
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [mentorChatMessages, setMentorChatMessages] = useState([]);
+  const [mentorChatDraft, setMentorChatDraft] = useState('');
   
   // Form State
   const [title, setTitle] = useState('');
@@ -23,8 +35,52 @@ function MentorContentPage() {
       apiFetch('/api/mentor/students').then(setStudents).catch(console.error);
     } else if (tab === 'evaluations') {
       refreshSubmissions();
+    } else if (tab === 'chats') {
+      apiFetch('/api/mentor/content').then((list) => {
+        setChatAssignments(list);
+        if (list?.length) setSelectedAssignmentId(list[0]._id);
+      }).catch(console.error);
     }
   }, [tab]);
+
+  // Poll near-real-time while chat is open.
+  useEffect(() => {
+    if (tab !== 'chats') return;
+    if (!selectedAssignmentId || !selectedStudentId) return;
+
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        const data = await apiFetch(
+          `/api/mentor/chats/threads/${selectedAssignmentId}/${selectedStudentId}/messages`
+        );
+        if (!cancelled) setMentorChatMessages(data.messages || []);
+      } catch {
+        // ignore transient errors
+      }
+    }
+
+    poll();
+    const id = setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [tab, selectedAssignmentId, selectedStudentId]);
+
+  // Load thread summaries when assignment changes (so the student list is always up to date).
+  useEffect(() => {
+    if (tab !== 'chats') return;
+    if (!selectedAssignmentId) return;
+
+    setSelectedStudentId('');
+    setMentorChatMessages([]);
+
+    apiFetch(`/api/mentor/chats/threads?assignmentId=${selectedAssignmentId}`)
+      .then(setMentorThreads)
+      .catch(console.error);
+  }, [tab, selectedAssignmentId]);
 
   function refreshSubmissions() {
       apiFetch('/api/mentor/submissions').then(setSubmissions).catch(console.error);
@@ -55,6 +111,7 @@ function MentorContentPage() {
         <button className={`button ${tab === 'upload' ? '' : 'secondary'}`} onClick={() => setTab('upload')} style={{ borderRadius: '99px' }}>Create Assignment</button>
         <button className={`button ${tab === 'students' ? '' : 'secondary'}`} onClick={() => setTab('students')} style={{ borderRadius: '99px' }}>My Students</button>
         <button className={`button ${tab === 'evaluations' ? '' : 'secondary'}`} onClick={() => setTab('evaluations')} style={{ borderRadius: '99px' }}>Evaluate Submissions</button>
+        <button className={`button ${tab === 'chats' ? '' : 'secondary'}`} onClick={() => setTab('chats')} style={{ borderRadius: '99px' }}>Assignment Chats</button>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -130,6 +187,154 @@ function MentorContentPage() {
                 </div>
               ))}
               {submissions.length === 0 && <p className="muted">No submissions require grading.</p>}
+            </div>
+          </section>
+        )}
+
+        {tab === 'chats' && (
+          <section>
+            <h3 style={{ marginBottom: '16px' }}>Chats (Assignment-wise)</h3>
+
+            <div style={{ display: 'flex', gap: '20px', alignItems: 'stretch' }}>
+              <div className="glass-panel" style={{ padding: '16px', width: '360px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  <div>
+                    <div className="muted" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 6 }}>
+                      Select Assignment
+                    </div>
+                    <select
+                      className="field"
+                      value={selectedAssignmentId}
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        setSelectedAssignmentId(id);
+                        setSelectedStudentId('');
+                        setMentorChatMessages([]);
+
+                        if (!id) return;
+                        apiFetch(`/api/mentor/chats/threads?assignmentId=${id}`)
+                          .then(setMentorThreads)
+                          .catch(console.error);
+                      }}
+                      style={{ appearance: 'none' }}
+                    >
+                      {chatAssignments.map((a) => (
+                        <option key={a._id} value={a._id}>
+                          {a.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <div className="muted" style={{ fontSize: '0.8rem', fontWeight: 700, marginBottom: 6 }}>
+                      Subscribed Students
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {mentorThreads.length === 0 && (
+                        <p className="muted">No chat threads yet for this assignment. Open a thread by sending the first message.</p>
+                      )}
+
+                      {mentorThreads.map((t) => (
+                        <button
+                          key={t.studentId}
+                          className="sidebar-link"
+                          style={{
+                            textAlign: 'left',
+                            border: '1px solid var(--border)',
+                            background:
+                              String(selectedStudentId) === String(t.studentId) ? 'rgba(59,130,246,0.15)' : 'transparent',
+                          }}
+                          onClick={() => {
+                            setSelectedStudentId(String(t.studentId));
+                          }}
+                        >
+                          <div style={{ fontWeight: 800 }}>{t.studentName}</div>
+                          <div className="muted" style={{ fontSize: '0.75rem', marginTop: 4 }}>
+                            {t.lastMessageText ? `Last: ${t.lastMessageText}` : 'No messages yet'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-panel" style={{ padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' }}>
+                <div className="muted" style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: 10 }}>
+                  {selectedStudentId ? 'Conversation' : 'Choose a student'}
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: '340px',
+                    maxHeight: '460px',
+                    overflowY: 'auto',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px',
+                    paddingRight: '6px',
+                  }}
+                >
+                  {mentorChatMessages.length === 0 ? (
+                    <p className="muted">Select a student to view messages.</p>
+                  ) : (
+                    mentorChatMessages.map((m, idx) => {
+                      const mine = mentorUserId && String(m.senderId) === String(mentorUserId);
+                      return (
+                        <div
+                          key={`${m.timestamp || idx}-${idx}`}
+                          style={{
+                            alignSelf: mine ? 'flex-end' : 'flex-start',
+                            maxWidth: '85%',
+                            borderRadius: '12px',
+                            padding: '10px 12px',
+                            border: '1px solid var(--border)',
+                            background: mine ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 800, marginBottom: 4 }}>
+                            {mine ? 'You' : 'Student'}
+                          </div>
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{m.messageText}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                            {m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : ''}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                  <input
+                    className="field"
+                    value={mentorChatDraft}
+                    onChange={(e) => setMentorChatDraft(e.target.value)}
+                    placeholder="Reply to the student's doubts..."
+                    style={{ flex: 1 }}
+                    disabled={!selectedAssignmentId || !selectedStudentId}
+                  />
+                  <Button
+                    disabled={!mentorChatDraft.trim() || !selectedAssignmentId || !selectedStudentId}
+                    onClick={async () => {
+                      if (!mentorChatDraft.trim() || !selectedAssignmentId || !selectedStudentId) return;
+                      await apiFetch(`/api/mentor/chats/threads/${selectedAssignmentId}/${selectedStudentId}/messages`, {
+                        method: 'POST',
+                        body: JSON.stringify({ messageText: mentorChatDraft }),
+                      });
+                      setMentorChatDraft('');
+                      // immediate refresh (poller will keep it updated)
+                      const data = await apiFetch(`/api/mentor/chats/threads/${selectedAssignmentId}/${selectedStudentId}/messages`);
+                      setMentorChatMessages(data.messages || []);
+                    }}
+                  >
+                    Send
+                  </Button>
+                </div>
+              </div>
             </div>
           </section>
         )}

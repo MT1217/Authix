@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
     if (token && !user) {
       const payload = decodeJwtPayload(token);
       if (payload?.role) {
-        const nextUser = { role: payload.role };
+        const nextUser = { role: payload.role, userId: payload.userId || '' };
         setUser(nextUser);
         sessionStorage.setItem('authUser', JSON.stringify(nextUser));
       }
@@ -54,7 +54,12 @@ export function AuthProvider({ children }) {
       body: JSON.stringify(payload),
     });
     setToken(data.token);
-    const nextUser = { role: data.role };
+    const jwtPayload = decodeJwtPayload(data.token);
+    const nextUser = {
+      role: data.role,
+      name: data.name || '',
+      userId: jwtPayload?.userId || '',
+    };
     setUser(nextUser);
     sessionStorage.setItem('authToken', data.token);
     sessionStorage.setItem('authUser', JSON.stringify(nextUser));
@@ -67,7 +72,12 @@ export function AuthProvider({ children }) {
       body: JSON.stringify(payload),
     });
     setToken(data.token);
-    const nextUser = { role: data.role };
+    const jwtPayload = decodeJwtPayload(data.token);
+    const nextUser = {
+      role: data.role,
+      name: data.name || payload?.name || '',
+      userId: jwtPayload?.userId || '',
+    };
     setUser(nextUser);
     sessionStorage.setItem('authToken', data.token);
     sessionStorage.setItem('authUser', JSON.stringify(nextUser));

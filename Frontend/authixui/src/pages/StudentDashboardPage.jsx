@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import SidebarLayout from '../components/layout/SidebarLayout';
 import Button from '../components/ui/Button';
 import { apiFetch } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 function StudentDashboardPage() {
   const [tab, setTab] = useState('search');
@@ -14,6 +15,14 @@ function StudentDashboardPage() {
   const [activeMentorId, setActiveMentorId] = useState(null);
   
   const [submissionText, setSubmissionText] = useState({});
+
+  const { user } = useAuth();
+  const currentUserId = user?.userId;
+
+  // Chat thread state (assignment-specific)
+  const [activeChat, setActiveChat] = useState(null); // { assignmentId, mentorId }
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatDraft, setChatDraft] = useState('');
 
   async function refreshMyMentors() {
     const list = await apiFetch('/api/student/mentors/subscribed');
@@ -61,6 +70,36 @@ function StudentDashboardPage() {
     setSubmissionText(prev => ({ ...prev, [contentId]: '' }));
     setTab('submissions');
   }
+
+  async function fetchChatMessages(assignmentId, mentorId) {
+    const data = await apiFetch(`/api/student/chats/threads/${assignmentId}/${mentorId}`);
+    setChatMessages(data.messages || []);
+  }
+
+  // Poll near-real-time while chat is open on the assignment tab.
+  useEffect(() => {
+    if (tab !== 'assignments') return;
+    if (!activeChat?.assignmentId || !activeChat?.mentorId) return;
+
+    let cancelled = false;
+
+    async function poll() {
+      try {
+        if (cancelled) return;
+        await fetchChatMessages(activeChat.assignmentId, activeChat.mentorId);
+      } catch (e) {
+        // ignore transient errors; polling will try again
+      }
+    }
+
+    poll();
+    const id = setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, activeChat?.assignmentId, activeChat?.mentorId]);
 
   return (
     <SidebarLayout title="Student Learning Hub">
@@ -142,6 +181,111 @@ function StudentDashboardPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Assignment-specific chat thread (one unique thread per assignment x mentor x student). */}
+                  <div style={{ marginTop: '18px' }}>
+                    <Button
+                      variant="secondary"
+                      style={{ marginBottom: '12px' }}
+                      onClick={async () => {
+                        const next = { assignmentId: c._id, mentorId: activeMentorId };
+                        const same =
+                          activeChat?.assignmentId === next.assignmentId && activeChat?.mentorId === next.mentorId;
+
+                        if (same) {
+                          setActiveChat(null);
+                          setChatMessages([]);
+                          setChatDraft('');
+                        } else {
+                          setActiveChat(next);
+                          setChatMessages([]);
+                          setChatDraft('');
+                          await fetchChatMessages(next.assignmentId, next.mentorId);
+                        }
+                      }}
+                    >
+                      {activeChat?.assignmentId === c._id && activeChat?.mentorId === activeMentorId
+                        ? 'Close Chat'
+                        : 'Open Assignment Chat'}
+                    </Button>
+
+                    {activeChat?.assignmentId === c._id && activeChat?.mentorId === activeMentorId && (
+                      <div className="glass-panel" style={{ padding: '16px', background: 'rgba(15,23,42,0.35)' }}>
+                        <div
+                          style={{
+                            maxHeight: '260px',
+                            overflowY: 'auto',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '10px',
+                            paddingRight: '6px',
+                          }}
+                        >
+                          {chatMessages.length === 0 && (
+                            <p className="muted">No messages yet. Ask the mentor a question about this assignment.</p>
+                          )}
+
+                          {chatMessages.map((m, idx) => {
+                            const mine = currentUserId && String(m.senderId) === String(currentUserId);
+                            return (
+                              <div
+                                key={`${m.timestamp || idx}-${idx}`}
+                                style={{
+                                  alignSelf: mine ? 'flex-end' : 'flex-start',
+                                  maxWidth: '85%',
+                                  borderRadius: '12px',
+                                  padding: '10px 12px',
+                                  border: '1px solid var(--border)',
+                                  background: mine ? 'rgba(59,130,246,0.25)' : 'rgba(255,255,255,0.05)',
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    fontSize: '0.82rem',
+                                    color: 'var(--text-muted)',
+                                    fontWeight: 700,
+                                    marginBottom: 4,
+                                  }}
+                                >
+                                  {mine ? 'You' : 'Mentor'}
+                                </div>
+                                <div style={{ whiteSpace: 'pre-wrap' }}>{m.messageText}</div>
+                                <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: 6 }}>
+                                  {m.timestamp ? new Date(m.timestamp).toLocaleTimeString() : ''}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '10px', marginTop: '12px' }}>
+                          <input
+                            className="field"
+                            value={chatDraft}
+                            onChange={(e) => setChatDraft(e.target.value)}
+                            placeholder="Type your question..."
+                            style={{ flex: 1 }}
+                          />
+                          <Button
+                            onClick={async () => {
+                              if (!chatDraft.trim()) return;
+                              await apiFetch(
+                                `/api/student/chats/threads/${c._id}/${activeMentorId}/messages`,
+                                {
+                                  method: 'POST',
+                                  body: JSON.stringify({ messageText: chatDraft }),
+                                }
+                              );
+                              setChatDraft('');
+                              await fetchChatMessages(c._id, activeMentorId);
+                            }}
+                          >
+                            Send
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

@@ -98,6 +98,26 @@ export async function listSubmissions(req, res) {
 }
 
 /**
+ * Mentor: list their own assignment contents.
+ * Used by the mentor chat UI to select an assignment and open per-student threads.
+ *
+ * Multi-tenant isolation:
+ * - Always filters by { tenantId: req.tenantId, mentorId: req.user.userId }.
+ */
+export async function listMyContent(req, res) {
+  try {
+    const contents = await Content.find({
+      tenantId: req.tenantId,
+      mentorId: req.user.userId,
+    }).select('_id title url assignment');
+
+    return res.json(contents);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to load content', error: error.message });
+  }
+}
+
+/**
  * Evaluate a submission
  */
 export async function evaluateSubmission(req, res) {

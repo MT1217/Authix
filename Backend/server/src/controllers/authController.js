@@ -19,6 +19,12 @@ export async function signup(req, res) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
+    // Require a display name for student accounts (and mentors too, for better UX).
+    // This does not change login behavior; it only validates signup payloads.
+    if ((role === 'student' || role === 'mentor') && (!name || !String(name).trim())) {
+      return res.status(400).json({ message: 'name is required for this role' });
+    }
+
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -42,7 +48,11 @@ export async function signup(req, res) {
       { expiresIn: '12h' }
     );
 
-    return res.status(201).json({ token, role: user.role });
+    return res.status(201).json({
+      token,
+      role: user.role,
+      name: user.profile?.name || '',
+    });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ message: 'Email already registered for this tenant' });
@@ -86,7 +96,11 @@ export async function login(req, res) {
       { expiresIn: '12h' }
     );
 
-    return res.json({ token, role: user.role });
+    return res.json({
+      token,
+      role: user.role,
+      name: user.profile?.name || '',
+    });
   } catch (error) {
     return res.status(500).json({ message: 'Login failed', error: error.message });
   }

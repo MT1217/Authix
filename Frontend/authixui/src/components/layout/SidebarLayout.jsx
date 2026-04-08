@@ -35,8 +35,19 @@ function SidebarLayout({ title, children }) {
             </div>
           )}
           <div style={{ marginLeft: '12px' }}>
-            <strong style={{ fontSize: '1.2rem', display: 'block', letterSpacing: '-0.3px' }}>{theme.brandName}</strong>
-            <div className="text-gradient" style={{ fontSize: '0.85rem', fontWeight: 600, marginTop: '2px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <strong style={{ fontSize: '1.2rem', display: 'block', letterSpacing: '-0.3px' }}>
+              {user?.name ? user.name : theme.brandName}
+            </strong>
+            <div
+              className="text-gradient"
+              style={{
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                marginTop: '2px',
+                textTransform: 'uppercase',
+                letterSpacing: '0.5px',
+              }}
+            >
               {user?.role || 'Guest'}
             </div>
           </div>
