@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/ui/Button';
@@ -7,12 +7,34 @@ function AuthHubPage() {
   const [mode, setMode] = useState('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [orgId, setOrgId] = useState('');
   const [role, setRole] = useState('student');
   const [name, setName] = useState('');
   const [expertise, setExpertise] = useState('');
   const [error, setError] = useState('');
-  const { login, signup } = useAuth();
+  const { login, mentorRegister, adminRegister, signup } = useAuth();
   const navigate = useNavigate();
+
+  const mentorOrgStorageKey = useMemo(() => {
+    const normalized = String(email || '').trim().toLowerCase();
+    return normalized ? `mentorOrgId:${normalized}` : '';
+  }, [email]);
+
+  const savedMentorOrgId = useMemo(() => {
+    if (!mentorOrgStorageKey) return '';
+    try {
+      return localStorage.getItem(mentorOrgStorageKey) || '';
+    } catch {
+      return '';
+    }
+  }, [mentorOrgStorageKey]);
+
+  useEffect(() => {
+    // Auto-hydrate orgId during mentor signup if we've seen this email before.
+    if (mode === 'signup' && role === 'mentor' && savedMentorOrgId && !orgId) {
+      setOrgId(savedMentorOrgId);
+    }
+  }, [mode, role, savedMentorOrgId, orgId]);
 
   function redirectByRole(userRole) {
     switch (userRole) {
@@ -38,7 +60,23 @@ function AuthHubPage() {
         const user = await login({ email, password });
         redirectByRole(user.role);
       } else {
-        const user = await signup({ email, password, role, name, expertise });
+        let user;
+        if (role === 'admin') {
+          // Tenant Admin signup bootstraps a brand-new organization + immutable tenantId.
+          user = await adminRegister({ email, ownerName: name, password });
+        } else if (role === 'mentor') {
+          // Mentor must provide tenant/org ID once at account creation.
+          user = await mentorRegister({ orgId, email, password, name, expertise });
+          if (mentorOrgStorageKey && orgId) {
+            try {
+              localStorage.setItem(mentorOrgStorageKey, String(orgId).trim());
+            } catch {
+              // ignore storage errors
+            }
+          }
+        } else {
+          user = await signup({ email, password, role, name, expertise });
+        }
         redirectByRole(user.role);
       }
     } catch (e) {
@@ -77,10 +115,20 @@ function AuthHubPage() {
                 <option value="admin">🏢 Tenant Admin (Owner)</option>
               </select>
               
-              <input className="field" value={name} onChange={(ev) => setName(ev.target.value)} placeholder="Full Name" type="text" required={role !== 'admin'} />
+              <input className="field" value={name} onChange={(ev) => setName(ev.target.value)} placeholder={role === 'admin' ? 'Owner Name' : 'Full Name'} type="text" required />
               
               {role === 'mentor' && (
-                <input className="field" value={expertise} onChange={(ev) => setExpertise(ev.target.value)} placeholder="Your Expertise (e.g. System Design, Product Management)" type="text" required />
+                <>
+                  <input
+                    className="field"
+                    value={orgId}
+                    onChange={(ev) => setOrgId(ev.target.value)}
+                    placeholder="Organization ID / Tenant ID (required once)"
+                    type="text"
+                    required
+                  />
+                  <input className="field" value={expertise} onChange={(ev) => setExpertise(ev.target.value)} placeholder="Your Expertise (e.g. System Design, Product Management)" type="text" required />
+                </>
               )}
             </>
           )}

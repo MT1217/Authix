@@ -12,9 +12,14 @@ export function getTenantFromHostname(hostname = typeof window !== 'undefined' ?
 /** Value sent on every API call — prefer localStorage, then hostname (never use a stale default). */
 export function getActiveTenantId() {
   if (typeof window === 'undefined') return 'platform-main';
+  // Prefer per-tab tenant (prevents one tab overwriting another org context)
+  const tabTenant = sessionStorage.getItem('tenantId');
+  if (tabTenant && tabTenant.trim()) return tabTenant.trim();
+
   const stored = localStorage.getItem('tenantId');
   if (stored && stored.trim()) return stored.trim();
   const derived = getTenantFromHostname();
   localStorage.setItem('tenantId', derived);
+  sessionStorage.setItem('tenantId', derived);
   return derived;
 }

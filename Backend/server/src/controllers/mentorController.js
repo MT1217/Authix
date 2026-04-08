@@ -73,7 +73,6 @@ export async function addContentVersion(req, res) {
 export async function listMyStudents(req, res) {
     try {
         const students = await User.find({ 
-            tenantId: req.tenantId, 
             role: 'student',
             subscribedMentorIds: req.user.userId 
         }).select('email profile');
@@ -88,7 +87,7 @@ export async function listMyStudents(req, res) {
  */
 export async function listSubmissions(req, res) {
     try {
-        const submissions = await Submission.find({ tenantId: req.tenantId, mentorId: req.user.userId })
+        const submissions = await Submission.find({ mentorId: req.user.userId })
             .populate('studentId', 'email')
             .populate('contentId', 'title assignment');
         return res.json(submissions);

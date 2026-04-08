@@ -27,19 +27,17 @@ export async function getStudentThread(req, res) {
     const assignmentId = requireObjectId(req.params.assignmentId);
     const mentorId = requireObjectId(req.params.mentorId);
 
-    // Ensure assignment belongs to this mentor and tenant.
+    // Ensure assignment belongs to this mentor.
     const content = await Content.findOne({
       _id: assignmentId,
-      tenantId: req.tenantId,
       mentorId,
     });
 
-    if (!content) return res.status(404).json({ message: 'Assignment not found in this tenant/mentor' });
+    if (!content) return res.status(404).json({ message: 'Assignment not found for this mentor' });
 
     // Ensure student subscription to that mentor.
     const student = await User.findOne({
       _id: req.user.userId,
-      tenantId: req.tenantId,
       role: 'student',
       subscribedMentorIds: mentorId,
     });
@@ -47,7 +45,7 @@ export async function getStudentThread(req, res) {
     if (!student) return res.status(403).json({ message: 'Not subscribed to this mentor' });
 
     const thread = await ChatThread.findOne({
-      tenantId: req.tenantId,
+      tenantId: content.tenantId,
       assignmentId,
       studentId: req.user.userId,
       mentorId,
@@ -56,7 +54,7 @@ export async function getStudentThread(req, res) {
     if (!thread) {
       // Create empty thread so subsequent UI refreshes are consistent.
       const created = await ChatThread.create({
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId: req.user.userId,
         mentorId,
@@ -89,14 +87,12 @@ export async function postStudentMessage(req, res) {
     // Validate assignment + subscription (same logic as GET).
     const content = await Content.findOne({
       _id: assignmentId,
-      tenantId: req.tenantId,
       mentorId,
     });
-    if (!content) return res.status(404).json({ message: 'Assignment not found in this tenant/mentor' });
+    if (!content) return res.status(404).json({ message: 'Assignment not found for this mentor' });
 
     const student = await User.findOne({
       _id: req.user.userId,
-      tenantId: req.tenantId,
       role: 'student',
       subscribedMentorIds: mentorId,
     });
@@ -104,7 +100,7 @@ export async function postStudentMessage(req, res) {
 
     const thread = await ChatThread.findOneAndUpdate(
       {
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId: req.user.userId,
         mentorId,
@@ -124,7 +120,7 @@ export async function postStudentMessage(req, res) {
     if (!thread) {
       // If thread didn't exist, create then push.
       const created = await ChatThread.create({
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId: req.user.userId,
         mentorId,
@@ -159,7 +155,6 @@ export async function listMentorThreads(req, res) {
     // so the UI can open a conversation even before any message exists.
     if (assignmentId) {
       const students = await User.find({
-        tenantId: req.tenantId,
         role: 'student',
         subscribedMentorIds: req.user.userId,
       }).select('email profile.name');
@@ -248,7 +243,6 @@ export async function getMentorThreadMessages(req, res) {
 
     const content = await Content.findOne({
       _id: assignmentId,
-      tenantId: req.tenantId,
       mentorId: req.user.userId,
     });
     if (!content) return res.status(404).json({ message: 'Assignment not found' });
@@ -256,14 +250,13 @@ export async function getMentorThreadMessages(req, res) {
     // Validate that student is actually subscribed to this mentor.
     const student = await User.findOne({
       _id: studentId,
-      tenantId: req.tenantId,
       role: 'student',
       subscribedMentorIds: req.user.userId,
     });
     if (!student) return res.status(403).json({ message: 'Student not subscribed to this mentor' });
 
     const thread = await ChatThread.findOne({
-      tenantId: req.tenantId,
+      tenantId: content.tenantId,
       assignmentId,
       studentId,
       mentorId: req.user.userId,
@@ -272,7 +265,7 @@ export async function getMentorThreadMessages(req, res) {
     if (!thread) {
       // Create an empty thread on first open so the mentor UI can show a consistent chat.
       const created = await ChatThread.create({
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId,
         mentorId: req.user.userId,
@@ -304,14 +297,12 @@ export async function postMentorMessage(req, res) {
 
     const content = await Content.findOne({
       _id: assignmentId,
-      tenantId: req.tenantId,
       mentorId: req.user.userId,
     });
     if (!content) return res.status(404).json({ message: 'Assignment not found' });
 
     const student = await User.findOne({
       _id: studentId,
-      tenantId: req.tenantId,
       role: 'student',
       subscribedMentorIds: req.user.userId,
     });
@@ -319,7 +310,7 @@ export async function postMentorMessage(req, res) {
 
     const thread = await ChatThread.findOneAndUpdate(
       {
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId,
         mentorId: req.user.userId,
@@ -338,7 +329,7 @@ export async function postMentorMessage(req, res) {
 
     if (!thread) {
       const created = await ChatThread.create({
-        tenantId: req.tenantId,
+        tenantId: content.tenantId,
         assignmentId,
         studentId,
         mentorId: req.user.userId,

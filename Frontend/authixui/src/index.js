@@ -7,8 +7,15 @@ import reportWebVitals from './reportWebVitals';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { AuthProvider } from './context/AuthContext';
 
-const tenantId = getTenantFromHostname();
-localStorage.setItem('tenantId', tenantId);
+const existingTenant =
+  sessionStorage.getItem('tenantId') || localStorage.getItem('tenantId') || getTenantFromHostname();
+const tenantId = existingTenant;
+if (!sessionStorage.getItem('tenantId')) {
+  sessionStorage.setItem('tenantId', tenantId);
+}
+if (!localStorage.getItem('tenantId')) {
+  localStorage.setItem('tenantId', tenantId);
+}
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

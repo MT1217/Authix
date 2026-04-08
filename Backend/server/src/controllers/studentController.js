@@ -9,7 +9,8 @@ import { Submission } from '../models/Submission.js';
 export async function searchMentors(req, res) {
   try {
     const { query } = req.query;
-    let filter = { tenantId: req.tenantId, role: 'mentor' };
+    // Global mentor discovery for students (not tenant-restricted).
+    let filter = { role: 'mentor' };
     
     if (query) {
       filter = {
@@ -39,10 +40,8 @@ export async function subscribeToMentor(req, res) {
         return res.status(400).json({ message: 'Invalid mentor ID' });
     }
 
-    const mentor = await User.findOne({ _id: mentorId, tenantId: req.tenantId, role: 'mentor' });
-    if (!mentor) {
-      return res.status(404).json({ message: 'Mentor not found in this tenant' });
-    }
+    const mentor = await User.findOne({ _id: mentorId, role: 'mentor' });
+    if (!mentor) return res.status(404).json({ message: 'Mentor not found' });
 
     await User.findByIdAndUpdate(req.user.userId, {
       $addToSet: { subscribedMentorIds: mentor._id }
@@ -73,12 +72,13 @@ export async function getMentorContent(req, res) {
   try {
      const { mentorId } = req.params;
      const me = await User.findById(req.user.userId);
-     
-     if (!me.subscribedMentorIds.includes(mentorId)) {
+
+     const isSubscribed = (me?.subscribedMentorIds || []).some((id) => String(id) === String(mentorId));
+     if (!isSubscribed) {
          return res.status(403).json({ message: 'Not subscribed to this mentor' });
      }
 
-     const content = await Content.find({ mentorId, tenantId: req.tenantId });
+     const content = await Content.find({ mentorId });
      return res.json(content);
   } catch (error) {
      return res.status(500).json({ message: 'Failed to load content', error: error.message });
@@ -93,14 +93,20 @@ export async function submitAssignment(req, res) {
         const { contentId } = req.params;
         const { answers, mentorId } = req.body;
 
-        const content = await Content.findOne({ _id: contentId, mentorId, tenantId: req.tenantId });
+        const me = await User.findById(req.user.userId);
+        const isSubscribed = (me?.subscribedMentorIds || []).some((id) => String(id) === String(mentorId));
+        if (!isSubscribed) {
+            return res.status(403).json({ message: 'Not subscribed to this mentor' });
+        }
+
+        const content = await Content.findOne({ _id: contentId, mentorId });
         if (!content) {
             return res.status(404).json({ message: 'Assignment not found' });
         }
 
         const submission = await Submission.findOneAndUpdate(
-            { tenantId: req.tenantId, studentId: req.user.userId, contentId },
-            { mentorId, answers, status: 'pending' },
+            { studentId: req.user.userId, contentId },
+            { tenantId: content.tenantId, mentorId, answers, status: 'pending' },
             { upsert: true, new: true }
         );
 
@@ -115,7 +121,7 @@ export async function submitAssignment(req, res) {
  */
 export async function listMySubmissions(req, res) {
     try {
-        const submissions = await Submission.find({ tenantId: req.tenantId, studentId: req.user.userId })
+        const submissions = await Submission.find({ studentId: req.user.userId })
             .populate('mentorId', 'profile.name')
             .populate('contentId', 'title');
         

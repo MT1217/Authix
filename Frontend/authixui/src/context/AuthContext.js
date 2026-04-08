@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { apiFetch } from '../utils/api';
 import { getTenantFromHostname } from '../utils/tenant';
+import { API_BASE } from '../utils/api';
 
 const AuthContext = createContext(null);
 
@@ -32,8 +33,13 @@ export function AuthProvider({ children }) {
   });
 
   useEffect(() => {
-    // Align with App.jsx / index bootstrap and clear legacy defaults like tenant-alpha
-    localStorage.setItem('tenantId', getTenantFromHostname());
+    // Initialize tenant only if missing; never overwrite an authenticated tenant context.
+    const existing = sessionStorage.getItem('tenantId') || localStorage.getItem('tenantId');
+    if (!existing) {
+      const derived = getTenantFromHostname();
+      sessionStorage.setItem('tenantId', derived);
+      localStorage.setItem('tenantId', derived);
+    }
   }, []);
 
   useEffect(() => {
@@ -53,6 +59,16 @@ export function AuthProvider({ children }) {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+
+    // Persist resolved tenant for subsequent sessions/tabs.
+    if (data?.tenantSubdomain) {
+      sessionStorage.setItem('tenantId', data.tenantSubdomain);
+      localStorage.setItem('tenantId', data.tenantSubdomain);
+    } else if (data?.tenantId) {
+      sessionStorage.setItem('tenantId', data.tenantId);
+      localStorage.setItem('tenantId', data.tenantId);
+    }
+
     setToken(data.token);
     const jwtPayload = decodeJwtPayload(data.token);
     const nextUser = {
@@ -66,11 +82,115 @@ export function AuthProvider({ children }) {
     return nextUser;
   }
 
+  /**
+   * First-time mentor onboarding with required orgId (tenant selector).
+   */
+  async function mentorRegister({ orgId, email, password, name, expertise }) {
+    const response = await fetch(`${API_BASE}/api/public/auth/mentor-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orgId, email, password, name, expertise }),
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { message: text || 'Unknown error' };
+    }
+
+    if (!response.ok) {
+      const err = new Error(body?.message || `API Error ${response.status}`);
+      err.status = response.status;
+      err.body = body;
+      throw err;
+    }
+
+    // Persist tenant so subsequent logins do not require orgId again.
+    if (body?.tenantSubdomain) {
+      sessionStorage.setItem('tenantId', body.tenantSubdomain);
+      localStorage.setItem('tenantId', body.tenantSubdomain);
+    } else if (body?.tenantId) {
+      sessionStorage.setItem('tenantId', body.tenantId);
+      localStorage.setItem('tenantId', body.tenantId);
+    }
+
+    setToken(body.token);
+    const jwtPayload = decodeJwtPayload(body.token);
+    const nextUser = {
+      role: body.role,
+      name: body.name || '',
+      userId: jwtPayload?.userId || '',
+    };
+    setUser(nextUser);
+    sessionStorage.setItem('authToken', body.token);
+    sessionStorage.setItem('authUser', JSON.stringify(nextUser));
+    return nextUser;
+  }
+
+  /**
+   * Bootstrap a brand new organization (Tenant) + owner Admin user.
+   * Public endpoint: does not require x-tenant-id header.
+   */
+  async function adminRegister({ email, ownerName, password }) {
+    const response = await fetch(`${API_BASE}/api/public/auth/admin-register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, ownerName, password }),
+    });
+
+    const text = await response.text();
+    let body = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      body = { message: text || 'Unknown error' };
+    }
+
+    if (!response.ok) {
+      const err = new Error(body?.message || `API Error ${response.status}`);
+      err.status = response.status;
+      err.body = body;
+      throw err;
+    }
+
+    // Persist the new tenant immediately so admin-scoped API calls work.
+    if (body?.tenantSubdomain) {
+      sessionStorage.setItem('tenantId', body.tenantSubdomain);
+      localStorage.setItem('tenantId', body.tenantSubdomain);
+    } else if (body?.tenantId) {
+      sessionStorage.setItem('tenantId', body.tenantId);
+      localStorage.setItem('tenantId', body.tenantId);
+    }
+
+    setToken(body.token);
+    const jwtPayload = decodeJwtPayload(body.token);
+    const nextUser = {
+      role: body.role,
+      name: body.name || '',
+      userId: jwtPayload?.userId || '',
+    };
+    setUser(nextUser);
+    sessionStorage.setItem('authToken', body.token);
+    sessionStorage.setItem('authUser', JSON.stringify(nextUser));
+    return nextUser;
+  }
+
   async function signup(payload) {
     const data = await apiFetch('/api/auth/signup', {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+
+    if (data?.tenantSubdomain) {
+      sessionStorage.setItem('tenantId', data.tenantSubdomain);
+      localStorage.setItem('tenantId', data.tenantSubdomain);
+    } else if (data?.tenantId) {
+      sessionStorage.setItem('tenantId', data.tenantId);
+      localStorage.setItem('tenantId', data.tenantId);
+    }
+
     setToken(data.token);
     const jwtPayload = decodeJwtPayload(data.token);
     const nextUser = {
@@ -96,6 +216,8 @@ export function AuthProvider({ children }) {
       token,
       user,
       login,
+      mentorRegister,
+      adminRegister,
       signup,
       logout,
       isAuthenticated: Boolean(token),
